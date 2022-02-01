@@ -1,25 +1,19 @@
 import express from "express";
-import { fileURLToPath } from "url";
-import { dirname, join } from "path";
 import uniqid from "uniqid";
-import fs from "fs";
 import createHttpError from "http-errors";
 import { validationResult } from "express-validator";
 import { newBlogpostValidation } from "./validation.js";
 
+import {
+  getBlogposts,
+  writeBlogposts,
+  getAuthors,
+} from "../../lib/fs-tools.js";
+
 const blogpostsRouter = express.Router();
-const blogpostsJSONPath = join(
-  dirname(fileURLToPath(import.meta.url)),
-  "blogposts.json"
-);
 
-const getblogposts = () => JSON.parse(fs.readFileSync(blogpostsJSONPath));
-const writeblogposts = (content) =>
-  fs.writeFileSync(blogpostsJSONPath, JSON.stringify(content));
-
-blogpostsRouter.post("/", newBlogpostValidation, (req, res, next) => {
+blogpostsRouter.post("/", newBlogpostValidation, async (req, res, next) => {
   try {
-    const newblogpost = { ...req.body, createdAt: new Date(), id: uniqid() };
     const errorsList = validationResult(req);
     if (errorsList.isEmpty()) {
       const newblogpost = { ...req.body, createdAt: new Date(), id: uniqid() };
@@ -28,7 +22,7 @@ blogpostsRouter.post("/", newBlogpostValidation, (req, res, next) => {
 
       blogpostsArray.push(newblogpost);
 
-      writeblogposts(blogpostsArray);
+      await writeBlogposts(blogpostsArray);
 
       res.status(201).send({ id: newblogpost.id });
     } else {
@@ -43,26 +37,27 @@ blogpostsRouter.post("/", newBlogpostValidation, (req, res, next) => {
   }
 });
 
-blogpostsRouter.get("/", (req, res, next) => {
+blogpostsRouter.get("/", async (req, res, next) => {
   try {
-    const blogpostsArray = getblogposts();
+    const blogpostsArray = await getBlogposts();
+    const authorsArray = await getAuthors();
     if (req.query && req.query.category) {
       const filteredblogposts = blogpostsArray.filter(
         (blogpost) => blogpost.category === req.query.category
       );
       res.send(filteredblogposts);
     } else {
-      res.send(blogpostsArray);
+      res.send({ authorsArray, blogpostsArray });
     }
   } catch (error) {
     next(error);
   }
 });
 
-blogpostsRouter.get("/:blogpostId", (req, res, next) => {
+blogpostsRouter.get("/:blogpostId", async (req, res, next) => {
   try {
     const blogpostId = req.params.blogpostId;
-    const blogpostsArray = getblogposts();
+    const blogpostsArray = await getBlogposts();
     const foundblogpost = blogpostsArray.find(
       (blogpost) => blogpost.id === blogpostId
     );
@@ -81,10 +76,10 @@ blogpostsRouter.get("/:blogpostId", (req, res, next) => {
   }
 });
 
-blogpostsRouter.put("/:blogpostId", (req, res, next) => {
+blogpostsRouter.put("/:blogpostId", async (req, res, next) => {
   try {
     const blogpostId = req.params.blogpostId;
-    const blogpostsArray = getblogposts();
+    const blogpostsArray = await getBlogposts();
     const index = blogpostsArray.findIndex(
       (blogpost) => blogpost.id === blogpostId
     );
@@ -95,21 +90,21 @@ blogpostsRouter.put("/:blogpostId", (req, res, next) => {
       updatedAt: new Date(),
     };
     blogpostsArray[index] = updatedblogpost;
-    writeblogposts(blogpostsArray);
+    writeBlogposts(blogpostsArray);
     res.send(updatedblogpost);
   } catch (error) {
     next(error);
   }
 });
 
-blogpostsRouter.delete("/:blogpostId", (req, res, next) => {
+blogpostsRouter.delete("/:blogpostId", async (req, res, next) => {
   try {
     const blogpostId = req.params.blogpostId;
-    const blogpostsArray = getblogposts();
+    const blogpostsArray = await getBlogposts();
     const remaningblogposts = blogpostsArray.filter(
       (blogpost) => blogpost.id !== blogpostId
     );
-    writeblogposts(remaningblogposts);
+    await writeBlogposts(remaningblogposts);
     res.status(204).send();
   } catch (error) {
     next(error);

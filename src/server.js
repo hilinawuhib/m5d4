@@ -1,4 +1,4 @@
-import express from "express"; // <-- NEW IMPORT SYNTAX (Enabled with type: "module" in package.json)
+import express from "express";
 import listEndpoints from "express-list-endpoints";
 import cors from "cors";
 import authorsRouter from "./services/authors/index.js";
@@ -9,11 +9,14 @@ import {
   notFoundHandler,
   genericErrorHandler,
 } from "./errorHandlers.js";
-import createHttpError from "http-errors";
+import filesRouter from "./services/files/index.js";
+
+import { join } from "path";
 
 const server = express();
 
 const port = 3001;
+const publicFolderPath = join(process.cwd(), "./public");
 const loggerMiddleware = (req, res, next) => {
   console.log(
     `Request method: ${req.method} --- URL ${req.url} --- ${new Date()}`
@@ -22,18 +25,13 @@ const loggerMiddleware = (req, res, next) => {
   next();
 };
 
-const fakeAuthMiddleware = (req, res, next) => {
-  if (req.name !== "Diego") res.status(401).send({ message: "Unauthorized" });
-  if (req.name !== "Diego")
-    next(createHttpError(401, "Non Diego users are not allowed!"));
-  else next();
-};
-
+server.use(express.static(publicFolderPath));
 server.use(loggerMiddleware);
 server.use(cors());
 server.use(express.json());
 server.use("/authors", loggerMiddleware, authorsRouter);
 server.use("/blogposts", blogpostsRouter);
+server.use("/files", filesRouter);
 
 server.use(badRequestHandler);
 server.use(unauthorizedHandler);
